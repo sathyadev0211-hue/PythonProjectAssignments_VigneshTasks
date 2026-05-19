@@ -1,0 +1,224 @@
+-- ============================================
+-- IMDB DATABASE DESIGN
+-- ============================================
+
+CREATE DATABASE IF NOT EXISTS IMDB;
+USE IMDB;
+
+-- ============================================
+-- TABLE DEFINITIONS
+-- ============================================
+
+-- Users table
+CREATE TABLE Users (
+    user_id     INT AUTO_INCREMENT PRIMARY KEY,
+    username    VARCHAR(100) NOT NULL,
+    email       VARCHAR(150) NOT NULL UNIQUE,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Movies table
+CREATE TABLE Movies (
+    movie_id    INT AUTO_INCREMENT PRIMARY KEY,
+    title       VARCHAR(200) NOT NULL,
+    release_year YEAR,
+    duration_min INT,
+    language    VARCHAR(50),
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── Requirement 1: Movie → multiple Media (Video or Image) ──
+CREATE TABLE Media (
+    media_id    INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id    INT NOT NULL,
+    media_type  ENUM('Video', 'Image') NOT NULL,
+    url         VARCHAR(500) NOT NULL,
+    title       VARCHAR(200),
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id) ON DELETE CASCADE
+);
+
+-- ── Requirement 2: Movie ↔ multiple Genre (many-to-many) ──
+CREATE TABLE Genres (
+    genre_id    INT AUTO_INCREMENT PRIMARY KEY,
+    genre_name  VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE Movie_Genres (
+    movie_id    INT NOT NULL,
+    genre_id    INT NOT NULL,
+    PRIMARY KEY (movie_id, genre_id),
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id) ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES Genres(genre_id) ON DELETE CASCADE
+);
+
+-- ── Requirement 3: Movie → multiple Reviews; Review → User ──
+CREATE TABLE Reviews (
+    review_id   INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id    INT NOT NULL,
+    user_id     INT NOT NULL,
+    rating      DECIMAL(3,1) CHECK (rating BETWEEN 0 AND 10),
+    review_text TEXT,
+    reviewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id)  REFERENCES Users(user_id)  ON DELETE CASCADE
+);
+
+-- ── Requirement 4: Artist → multiple Skills ──
+CREATE TABLE Artists (
+    artist_id   INT AUTO_INCREMENT PRIMARY KEY,
+    full_name   VARCHAR(150) NOT NULL,
+    birth_date  DATE,
+    nationality VARCHAR(100)
+);
+
+CREATE TABLE Skills (
+    skill_id    INT AUTO_INCREMENT PRIMARY KEY,
+    skill_name  VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE Artist_Skills (
+    artist_id   INT NOT NULL,
+    skill_id    INT NOT NULL,
+    PRIMARY KEY (artist_id, skill_id),
+    FOREIGN KEY (artist_id) REFERENCES Artists(artist_id) ON DELETE CASCADE,
+    FOREIGN KEY (skill_id)  REFERENCES Skills(skill_id)   ON DELETE CASCADE
+);
+
+-- ── Requirement 5: Artist → multiple Roles in a single Film ──
+CREATE TABLE Roles (
+    role_id     INT AUTO_INCREMENT PRIMARY KEY,
+    role_name   VARCHAR(100) NOT NULL UNIQUE  -- e.g. Actor, Director, Producer
+);
+
+CREATE TABLE Movie_Cast (
+    cast_id     INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id    INT NOT NULL,
+    artist_id   INT NOT NULL,
+    role_id     INT NOT NULL,
+    character_name VARCHAR(150),             -- NULL for crew roles
+    FOREIGN KEY (movie_id)  REFERENCES Movies(movie_id)   ON DELETE CASCADE,
+    FOREIGN KEY (artist_id) REFERENCES Artists(artist_id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id)   REFERENCES Roles(role_id)     ON DELETE CASCADE
+);
+
+-- ============================================
+-- SAMPLE DATA
+-- ============================================
+
+-- Users
+INSERT INTO Users (username, email) VALUES
+('alice',   'alice@example.com'),
+('bob',     'bob@example.com'),
+('charlie', 'charlie@example.com');
+
+-- Movies
+INSERT INTO Movies (title, release_year, duration_min, language) VALUES
+('Inception',        2010, 148, 'English'),
+('The Dark Knight',  2008, 152, 'English'),
+('Interstellar',     2014, 169, 'English');
+
+-- Media  (Req 1)
+INSERT INTO Media (movie_id, media_type, url, title) VALUES
+(1, 'Video', 'https://cdn.imdb.com/inception_trailer.mp4',   'Inception Trailer'),
+(1, 'Image', 'https://cdn.imdb.com/inception_poster.jpg',    'Inception Poster'),
+(2, 'Video', 'https://cdn.imdb.com/tdk_trailer.mp4',         'Dark Knight Trailer'),
+(2, 'Image', 'https://cdn.imdb.com/tdk_poster.jpg',          'Dark Knight Poster'),
+(3, 'Video', 'https://cdn.imdb.com/interstellar_trailer.mp4','Interstellar Trailer');
+
+-- Genres  (Req 2)
+INSERT INTO Genres (genre_name) VALUES
+('Sci-Fi'), ('Action'), ('Thriller'), ('Drama'), ('Adventure');
+
+INSERT INTO Movie_Genres (movie_id, genre_id) VALUES
+(1, 1), (1, 3),       -- Inception: Sci-Fi, Thriller
+(2, 2), (2, 3),       -- Dark Knight: Action, Thriller
+(3, 1), (3, 4), (3, 5); -- Interstellar: Sci-Fi, Drama, Adventure
+
+-- Reviews  (Req 3)
+INSERT INTO Reviews (movie_id, user_id, rating, review_text) VALUES
+(1, 1, 9.0, 'Mind-bending masterpiece!'),
+(1, 2, 8.5, 'Great visuals and storyline.'),
+(2, 1, 9.5, 'Best superhero movie ever.'),
+(2, 3, 9.0, 'Ledger was phenomenal.'),
+(3, 2, 8.8, 'Emotional and visually stunning.');
+
+-- Artists
+INSERT INTO Artists (full_name, birth_date, nationality) VALUES
+('Leonardo DiCaprio', '1974-11-11', 'American'),
+('Christopher Nolan', '1970-07-30', 'British-American'),
+('Christian Bale',    '1974-01-30', 'British'),
+('Anne Hathaway',     '1982-11-12', 'American'),
+('Matthew McConaughey','1969-11-04','American');
+
+-- Skills  (Req 4)
+INSERT INTO Skills (skill_name) VALUES
+('Acting'), ('Directing'), ('Producing'), ('Screenwriting'), ('Stunts');
+
+INSERT INTO Artist_Skills (artist_id, skill_id) VALUES
+(1, 1),           -- DiCaprio: Acting
+(2, 2),(2,3),(2,4), -- Nolan: Directing, Producing, Screenwriting
+(3, 1),(3,5),     -- Bale: Acting, Stunts
+(4, 1),           -- Hathaway: Acting
+(5, 1),(5,3);     -- McConaughey: Acting, Producing
+
+-- Roles
+INSERT INTO Roles (role_name) VALUES
+('Actor'), ('Director'), ('Producer'), ('Screenwriter'), ('Cinematographer');
+
+-- Movie_Cast – artist performing MULTIPLE roles in one film  (Req 5)
+INSERT INTO Movie_Cast (movie_id, artist_id, role_id, character_name) VALUES
+-- Inception
+(1, 1, 1, 'Dom Cobb'),          -- DiCaprio as Actor
+(1, 2, 2, NULL),                -- Nolan as Director
+(1, 2, 3, NULL),                -- Nolan also as Producer  ← same film, two roles
+(1, 2, 4, NULL),                -- Nolan also as Screenwriter
+-- The Dark Knight
+(2, 3, 1, 'Bruce Wayne'),
+(2, 2, 2, NULL),
+(2, 2, 3, NULL),                -- Nolan: Director + Producer again
+-- Interstellar
+(3, 5, 1, 'Cooper'),
+(3, 2, 2, NULL),
+(3, 2, 3, NULL),
+(3, 4, 1, 'Brand');
+
+-- ============================================
+-- VERIFICATION QUERIES
+-- ============================================
+
+-- 1. All media for each movie
+SELECT m.title, md.media_type, md.url
+FROM Movies m JOIN Media md ON m.movie_id = md.movie_id
+ORDER BY m.title;
+
+-- 2. Movies with their genres
+SELECT m.title, GROUP_CONCAT(g.genre_name ORDER BY g.genre_name) AS genres
+FROM Movies m
+JOIN Movie_Genres mg ON m.movie_id = mg.movie_id
+JOIN Genres g        ON mg.genre_id = g.genre_id
+GROUP BY m.title;
+
+-- 3. Reviews with user names
+SELECT m.title, u.username, r.rating, r.review_text
+FROM Reviews r
+JOIN Movies m ON r.movie_id = m.movie_id
+JOIN Users  u ON r.user_id  = u.user_id
+ORDER BY m.title;
+
+-- 4. Artists and their skills
+SELECT a.full_name, GROUP_CONCAT(s.skill_name ORDER BY s.skill_name) AS skills
+FROM Artists a
+JOIN Artist_Skills as_ ON a.artist_id = as_.artist_id
+JOIN Skills s           ON as_.skill_id = s.skill_id
+GROUP BY a.full_name;
+
+-- 5. Artists performing multiple roles in a single film
+SELECT m.title, a.full_name, GROUP_CONCAT(ro.role_name ORDER BY ro.role_name) AS roles
+FROM Movie_Cast mc
+JOIN Movies  m  ON mc.movie_id  = m.movie_id
+JOIN Artists a  ON mc.artist_id = a.artist_id
+JOIN Roles   ro ON mc.role_id   = ro.role_id
+GROUP BY m.title, a.full_name
+HAVING COUNT(ro.role_id) > 1
+ORDER BY m.title;
