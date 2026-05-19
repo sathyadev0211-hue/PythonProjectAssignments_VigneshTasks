@@ -1,0 +1,8 @@
+# Requirements for Robot Framework Login Test Project
+# Install all dependencies with:
+#   pip install -r requirements.txt
+
+robotframework==7.0
+robotframework-seleniumlibrary==6.3.0
+selenium==4.18.1
+webdriver-manager==4.0.1
